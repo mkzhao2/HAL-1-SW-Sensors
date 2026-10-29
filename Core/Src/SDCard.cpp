@@ -64,6 +64,27 @@ int8_t SD_LogInline(const char* msg)
     return ret;
 }
 
+int8_t SD_Write(const char* data, uint32_t len)
+{
+    if (!s_open || !s_mutex) return -1;
+    if (osMutexAcquire(s_mutex, pdMS_TO_TICKS(50)) != osOK) return -4;
+    int8_t ret = 0;
+    UINT written = 0;
+    if (f_write(&s_file, data, len, &written) != FR_OK || written != len) ret = -2;
+    osMutexRelease(s_mutex);
+    return ret;
+}
+
+int8_t SD_Sync()
+{
+    if (!s_open || !s_mutex) return -1;
+    if (osMutexAcquire(s_mutex, pdMS_TO_TICKS(50)) != osOK) return -4;
+    int8_t ret = 0;
+    if (f_sync(&s_file) != FR_OK) ret = -3;
+    osMutexRelease(s_mutex);
+    return ret;
+}
+
 int8_t SD_LogGPS(double lat, double lon, double alt,
                  uint8_t hour, uint8_t min, uint8_t sec)
 {
