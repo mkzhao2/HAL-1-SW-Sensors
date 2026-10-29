@@ -17,7 +17,7 @@ static const osMutexAttr_t k_sd_mutex_attr = {
     "sdMtx", osMutexPrioInherit, nullptr, 0U
 };
 
-int8_t SD_Init()
+int8_t SD_Init(const char* filename)
 {
     if (s_open) return 0;
 
@@ -34,7 +34,7 @@ int8_t SD_Init()
     if (res != FR_OK) return -(int8_t)res;
 
     // f_open failure: offset FRESULT by -100 so mount vs open errors are distinguishable.
-    res = f_open(&s_file, "HAL1_LOG.TXT", FA_OPEN_ALWAYS | FA_WRITE);
+    res = f_open(&s_file, filename, FA_OPEN_ALWAYS | FA_WRITE);
     if (res != FR_OK) return (int8_t)(-100 - (int8_t)res);
 
     f_lseek(&s_file, f_size(&s_file));   // seek to end for append behaviour
