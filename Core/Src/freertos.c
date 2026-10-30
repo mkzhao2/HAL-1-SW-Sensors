@@ -43,6 +43,9 @@ void Radio(void*);
 void CTRLs(void*);
 void SDLogTask(void*);
 void Initial_Condition_Tare(void*);
+#ifdef ALLAN_TEST_MODE
+void AllanTestTask(void*);
+#endif
 extern TaskHandle_t updateDataTaskHandle;
 extern TaskHandle_t CTRLIndicationHandle;
 /* USER CODE END PD */
@@ -101,6 +104,15 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
+#ifdef ALLAN_TEST_MODE
+  // ── Allan-deviation test build: only the raw-IMU logger runs (AllanTest.cpp) ──
+  static const osThreadAttr_t allanTask_attr = {
+    .name = "AllanTest", .stack_size = 4096, .priority = osPriorityHigh,
+  };
+  osThreadNew(AllanTestTask, NULL, &allanTask_attr);
+  return;  // no flight tasks
+#endif
+
   // ── FC init (runs once, sets up DWT timer and peripherals) ──────────────────
   defaultTaskHandle = osThreadNew(FC_Init, NULL, &defaultTask_attributes);
 

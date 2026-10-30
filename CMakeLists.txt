@@ -115,6 +115,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
         Core/Src/bmi323.c
         Core/Src/sd_diskio.c
         Core/Src/SDCard.cpp
+        Core/Src/AllanTest.cpp
 )
 
 # Add include paths
@@ -127,6 +128,13 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined symbols
 )
+
+# Allan-deviation test build: runs only the raw-IMU logger (Core/Src/AllanTest.cpp)
+# instead of the flight tasks. Build it with the "AllanTest" preset.
+option(ALLAN_TEST_MODE "Build the Allan-deviation IMU logger instead of the flight tasks" OFF)
+if (ALLAN_TEST_MODE)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ALLAN_TEST_MODE)
+endif ()
 
 # Remove wrong libob.a library dependency when using cpp files
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
