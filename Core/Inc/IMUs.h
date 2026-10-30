@@ -44,9 +44,10 @@ class   IMUs {
 public:
     IMUs();
 
-    IMUsStatus Init(bool tmr_on);
+    IMUsStatus Init(bool tmr_on, const BMI_Config& cfg = BMI_Config());
     IMUsStatus Update();
     BMI_Data getRawBMI(uint8_t index);
+    BMI_RawSample getRawSample(uint8_t index);
     BMI_Data getVotedBMI();
     ISM_Data getRawISM();
 };

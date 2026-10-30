@@ -4,6 +4,16 @@
 
 #include "IMUs.h"
 
+// Update one BMI323 and keep its latest sample in out.
+// Returns the IMUsStatus code: 0 = OK (new or unchanged sample), 1 = read error.
+static int8_t updateBMI(SIMU_BMI323& bmi, BMI_Data& out)
+{
+    const int rslt = bmi.Update();
+    if (rslt < 0) return 1;                  // read error: keep previous sample
+    if (rslt == 0) out = bmi.getRawData();   // new sample (BMI_NO_NEW_DATA: keep previous)
+    return 0;
+}
+
 //PRIVATE:
 
 uint8_t IMUs::TMR_Compute() {
@@ -24,13 +34,13 @@ uint8_t IMUs::Normal_Compute() {
 
 IMUs::IMUs() : Data_ISM() {}
 
-IMUsStatus IMUs::Init(bool tmr_on) {
+IMUsStatus IMUs::Init(bool tmr_on, const BMI_Config& cfg) {
     TMR_STATE = tmr_on;
 
-    sensorStatus.A = BMI323_A.Init(SENSOR1_I);
+    sensorStatus.A = BMI323_A.Init(SENSOR1_I, cfg);
     if (TMR_STATE) {
-        sensorStatus.B = BMI323_B.Init(SENSOR2_I);
-        sensorStatus.C = BMI323_C.Init(SENSOR3_I);
+        sensorStatus.B = BMI323_B.Init(SENSOR2_I, cfg);
+        sensorStatus.C = BMI323_C.Init(SENSOR3_I, cfg);
     }
 
     // sensorStatus.ISM = ISM6HGx.Init();  // ISM6HGx not used this flight
@@ -39,25 +49,11 @@ IMUsStatus IMUs::Init(bool tmr_on) {
 }
 
 IMUsStatus IMUs::Update() {
-    if (BMI323_A.Update() != 0) sensorStatus.A = 1;
-    else {
-        Raw_BMI.BMIA_d = BMI323_A.getRawData();
-        sensorStatus.A = 0;
-    }
+    sensorStatus.A = updateBMI(BMI323_A, Raw_BMI.BMIA_d);
 
     if (TMR_STATE) {
-        if (BMI323_B.Update() != 0) sensorStatus.B = 1;
-        else {
-            Raw_BMI.BMIB_d = BMI323_B.getRawData();
-            sensorStatus.B = 0;
-        }
-
-
-        if (BMI323_C.Update() != 0) sensorStatus.C = 1;
-        else {
-            Raw_BMI.BMIC_d = BMI323_C.getRawData();
-            sensorStatus.C = 0;
-        }
+        sensorStatus.B = updateBMI(BMI323_B, Raw_BMI.BMIB_d);
+        sensorStatus.C = updateBMI(BMI323_C, Raw_BMI.BMIC_d);
     }
 
     // sensorStatus.ISM = ISM6HGx.Update();  // ISM6HGx not used this flight
@@ -79,6 +75,16 @@ BMI_Data IMUs::getRawBMI(uint8_t index) {
         case 0:  return Raw_BMI.BMIA_d;
         case 1:  return Raw_BMI.BMIB_d;
         case 2:  return Raw_BMI.BMIC_d;
+        default: return {};
+    }
+}
+
+// Index 0-2 for sensors A, B, and C: latest raw register counts + sample counter.
+BMI_RawSample IMUs::getRawSample(uint8_t index) {
+    switch (index) {
+        case 0:  return BMI323_A.getRawSample();
+        case 1:  return BMI323_B.getRawSample();
+        case 2:  return BMI323_C.getRawSample();
         default: return {};
     }
 }
