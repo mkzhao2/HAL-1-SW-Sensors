@@ -178,11 +178,12 @@ extern "C" void AllanTestTask(void*)
     uint32_t lastCount[3] = {};
     for (;;) {
         s_imu.Update();
+        const uint64_t tUs = nowUs();                // one timestamp per poll, right after the reads
         for (uint8_t i = 0; i < 3; i++) {
             const BMI_RawSample s = s_imu.getRawSample(i);
             if (s.count == lastCount[i]) continue;   // no new sample since the last poll
             lastCount[i] = s.count;
-            queueSample(i, s);
+            queueSample(i, s, tUs);
         }
         osDelay(1);   // 1 kHz poll vs 200 Hz ODR
     }
