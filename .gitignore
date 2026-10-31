@@ -11,3 +11,5 @@ mx.scratch
 /.idea/workspace.xml
 
 env/*
+
+settings.json
