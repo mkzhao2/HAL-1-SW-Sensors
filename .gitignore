@@ -13,3 +13,4 @@ mx.scratch
 env/*
 
 settings.json
+__pycache__/
