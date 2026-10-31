@@ -11,7 +11,8 @@
 //                            so the sampling task keeps running during writes.
 //
 // Output: ALLAN.CSV, appended; every run starts with its own header block.
-//   imu,count,tick_ms,sens_time,gx,gy,gz,ax,ay,az,temp_raw
+//   imu,count,t_us,sens_time,gx,gy,gz,ax,ay,az,temp_raw
+//   t_us = MCU time of the poll that read the sample, microseconds since boot
 //   gx..az, temp_raw are raw LSB counts; the run header has the scale factors.
 //   count gaps     = lines dropped because the SD card fell behind
 //   sens_time gaps = sensor samples that were never read (polling too slow)
@@ -55,6 +56,26 @@ StreamBufferHandle_t s_stream       = nullptr;
 volatile uint32_t    s_droppedLines = 0;        // written only by AllanTestTask
 volatile bool        s_sdError      = false;    // written only by AllanWriterTask
 
+// microseconds since boot. Returned as a 64 bit int, so this should last us about 1k years.
+//  
+// CYCCNT is number of clock cycles since boot, provided by the MCU. but, this is
+// 32 bit, so it overflows after only like 10 seconds
+//
+// we thus accumulate our own clock cycles since boot (totalCyc), and increase it
+// by the change in CYCCNT since the last time nowUs was called
+// 
+// WARNING: because of this rollover issue, MUST CALL AT LEAST ONCE EVERY 10 SECONDS
+// otherwise CYCCNT rolls over twice and then our delta (cyc - lastCyc) we don't know what actually is
+uint64_t nowUs()
+{
+    static uint32_t lastCyc  = 0;
+    static uint64_t totalCyc = 0;
+    const uint32_t cyc = DWT->CYCCNT;
+    totalCyc += (uint32_t)(cyc - lastCyc);   // wrap-safe delta
+    lastCyc = cyc;
+    return totalCyc / (SystemCoreClock / 1000000U);
+}
+
 void blinkWait()   // fast blink while waiting for hardware
 {
     HAL_GPIO_TogglePin(USR_LED_GPIO_Port, USR_LED_Pin);
@@ -80,20 +101,29 @@ void writeRunHeader()
         "\n=== ALLAN RUN START ===\n"
         "# odr_hz=%d acc_range_g=%d gyr_range_dps=%d\n"
         "# acc_g = raw*%d/32768, gyr_dps = raw*%d/32768, temp_c = temp_raw/512+23\n"
+        "# t_us: MCU time of the poll that read the sample, microseconds since boot\n"
         "# sens_time: BMI323 timestamp, 39.0625 us per tick, 32-bit (wraps after ~46.6 h)\n"
-        "imu,count,tick_ms,sens_time,gx,gy,gz,ax,ay,az,temp_raw\n",
+        "imu,count,t_us,sens_time,gx,gy,gz,ax,ay,az,temp_raw\n",
         ODR_HZ, ACC_RANGE_G, GYR_RANGE_DPS, ACC_RANGE_G, GYR_RANGE_DPS);
     SD_LogInline(hdr);   // written and synced before logging starts
 }
 
 // One CSV line for IMU i into the stream buffer. Whole lines only: if the buffer
 // is too full the line is dropped, which shows up as a gap in the count column.
-void queueSample(uint8_t i, const BMI_RawSample& s)
+void queueSample(uint8_t i, const BMI_RawSample& s, uint64_t tUs)
 {
-    char line[96];
-    const int n = snprintf(line, sizeof(line), "%d,%lu,%lu,%lu,%d,%d,%d,%d,%d,%d,%d\n",
-        i, (unsigned long)s.count, (unsigned long)HAL_GetTick(), (unsigned long)s.sensTime,
-        s.gyr[0], s.gyr[1], s.gyr[2], s.acc[0], s.acc[1], s.acc[2], s.temp);
+    // newlib-nano's printf has no %llu: print t_us as seconds + 6-digit remainder
+    const unsigned long sec = (unsigned long)(tUs / 1000000U);
+    const unsigned long rem = (unsigned long)(tUs % 1000000U);
+
+    char line[112];
+    const int n = (sec != 0)
+        ? snprintf(line, sizeof(line), "%d,%lu,%lu%06lu,%lu,%d,%d,%d,%d,%d,%d,%d\n",
+              i, (unsigned long)s.count, sec, rem, (unsigned long)s.sensTime,
+              s.gyr[0], s.gyr[1], s.gyr[2], s.acc[0], s.acc[1], s.acc[2], s.temp)
+        : snprintf(line, sizeof(line), "%d,%lu,%lu,%lu,%d,%d,%d,%d,%d,%d,%d\n",
+              i, (unsigned long)s.count, rem, (unsigned long)s.sensTime,
+              s.gyr[0], s.gyr[1], s.gyr[2], s.acc[0], s.acc[1], s.acc[2], s.temp);
     if (n <= 0 || n >= (int)sizeof(line)) return;
 
     if (xStreamBufferSpacesAvailable(s_stream) >= (size_t)n)
