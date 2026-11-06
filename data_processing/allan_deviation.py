@@ -36,7 +36,7 @@ from visualization import (IMU_COLORS, IMU_NAMES, load_run, sample_intervals_ms,
 # ── Settings ────────────────────────────────────────────────────────────────
 FILE = "data/ALLAN.CSV"   # relative to this script's folder, or an absolute path
 RUN = None                # run number (python visualization.py ALLAN.CSV --list); None = last
-KEEP = None               # clean segments in seconds since run start: [(start, end), ...]
+KEEP = [(5 * 60, 440*60)]               # clean segments in seconds since run start: [(start, end), ...]
                           #   e.g. KEEP = [(300, 2500), (2600, 7000)];  None = whole run
 IMUS = ["A", "B", "C"]
 AXES = [("gx", "Gyro X"), ("gy", "Gyro Y"), ("gz", "Gyro Z")]
