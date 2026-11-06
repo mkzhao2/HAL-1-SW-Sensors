@@ -10,6 +10,14 @@ you also need the python dependencies. you can do
 [make a python environment](https://realpython.com/python-virtual-environments-a-primer/)
 and install the python dependencies there
 
+# getting the data (important)
+
+don't push data to the github; the files are too big
+
+you have to download the data
+
+they are probably in the google drive or slack somewhere
+
 # visualization
 
 takes the raw data from the flight computer and just plots a bunch of graphs
